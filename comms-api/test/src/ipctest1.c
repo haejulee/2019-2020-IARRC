@@ -6,8 +6,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#define PUB_PATH "../test/config/pub_ipc.json"
-#define SUB_PATH "../test/config/sub_ipc.json"
+#define PUB_PATH "./test/config/pub_ipc.json"
+#define SUB_PATH "./test/config/sub_ipc.json"
 
 void print_configs(topic_info_array_t *configs);
 void print_message(msg_t *msg);

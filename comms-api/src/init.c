@@ -8,11 +8,15 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
  
 #include "comms.h" 
 
 #define MAX_CONFIG_SIZE 1024	// TODO: make this a reasonable number
 #define NODECODE 12345			/* value of nodecode in node_t struct */
+#define IPCFILEDIR "/home/pringles/Documents/2019-2020-IARRC/comms-api/ipcfiles/"
 
 
 /* -------------------------------GLOBAL VARIABLES------------------------------------ */
@@ -78,9 +82,9 @@ static int init_topics(struct array_list *topics, int n, topic_t **sock_array, t
 static topic_info_t *parse_topic(struct json_object *topic);
 
 /** Helper for init_topics()
- * checks if the file at "/home/robot/Documents/2019-2020-IARRC/comms-api/ipcfiles/"+path exists, and creates the file if it doesn't exist yet
+ * checks if the file at IPCFILEDIR+file exists, and creates the file if it doesn't exist yet
  */
-static void ipc_file(char *path);
+static void ipc_file(char *file);
 
 /** Helper for init_topics()
  * frees all the mallocs that are part of a topic_info_t
@@ -205,22 +209,32 @@ static int init_topics(struct array_list *topics, int n, topic_t **sock_array, t
 			strcpy(endpoint, "inproc://");
 		}
 		else {
-			endpoint = malloc(17+strlen(info->address)+1);	/* "ipc:///home/robot/Documents/2019-2020-IARRC/comms-api/ipcfiles/" + address + "\0" */
+			endpoint = malloc(6+strlen(IPCFILEDIR)+strlen(info->address)+1);  /* "ipc://" + IPCFILEDIR + address + "\0"  */
 			if (endpoint == NULL) { return -1; }
-			strcpy(endpoint, "ipc:///home/robot/Documents/2019-2020-IARRC/comms-api/ipcfiles/");
+			strcpy(endpoint, "ipc://");
+			strcat(endpoint, IPCFILEDIR);
 		}
 		strcat(endpoint, info->address);
 		
 		/* CONNECT/BIND THE SOCKET */
 		if (strcmp(info->transport, IPC) == 0) {	
-			ipc_file(info->address);	/* make sure /home/robot/Documents/2019-2020-IARRC/comms-api/ipcfiles/+address exist for ipc */
+			ipc_file(info->address);	/* make sure the address file exist for ipc */
 		}
 		if (type == ZMQ_PUB) {
-			if (zmq_bind(socket, endpoint) != 0) return -1;
+			if (zmq_bind(socket, endpoint) != 0) {
+			       	free(endpoint);
+				return -1;
+			}
 		}
 		else {
-			if (zmq_setsockopt(socket, ZMQ_SUBSCRIBE, NULL, 0) != 0) return -1;	/* all subs receive all messages */
-			if (zmq_connect(socket, endpoint) != 0) return -1;
+			if (zmq_setsockopt(socket, ZMQ_SUBSCRIBE, NULL, 0) != 0) {
+				free(endpoint);
+				return -1;	/* all subs receive all messages */
+			}
+			if (zmq_connect(socket, endpoint) != 0) {
+				free(endpoint);
+				return -1;
+			}
 		}
 		free(endpoint);
 		
@@ -283,9 +297,19 @@ static topic_info_t *parse_topic(struct json_object *topic) {
 	return parsed;
 }
 
-static void ipc_file(char *path) {
-	// TODO
-	// check if /home/robot/Documents/2019-2020-IARRC/comms-api/ipcfiles/path exists & create it otherwise
+static void ipc_file(char *file) {
+	// check if IPCFILEDIR exists & create it otherwise
+	struct stat st = {0};
+	if (stat(IPCFILEDIR, &st) == -1) {
+		mkdir(IPCFILEDIR, 0700);
+	}
+	// // create IPCFILEDIR+file if it doesn't exist yet
+	// char *fullpath = malloc(sizeof(IPCFILEDIR)+sizeof(file)+1);
+	// strcpy(fullpath, IPCFILEDIR);
+	// strcat(fullpath, file);
+	// FILE *fptr;
+	// fptr = fopen(fullpath, "w+");
+	// free(fullpath);
 }
 
 static void free_topic_info(topic_info_t *p) {

@@ -6,8 +6,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#define PUB_PATH "../test/config/pub_ipc.json"
-#define SUB_PATH "../test/config/sub_ipc.json"
+#define PUB_PATH "./test/config/pub_ipc.json"
+#define SUB_PATH "./test/config/sub_ipc.json"
 
 void print_configs(topic_info_array_t *configs);
 void print_message(msg_t *msg);
@@ -24,7 +24,9 @@ void subscriber() {
         }
         printf("subscriber socket initialized\n");
 	while (1) {
+	printf("BEFORE RECV()\n");
         recv("sub1", 0, "blocking", snode);
+	printf("AFTER RECV()\n");
 	}
 }
 
@@ -53,6 +55,7 @@ void print_message(msg_t *msg) {
 
 void recv(char *topic, int flag, char *s_flag, void *node) {
         printf("receiving message on %s...\n", topic);
+	printf("BEFORE SUBSCRIBE()\n");
         msg_t *msg = subscribe(topic, flag, node);
         if (msg == NULL) perror(s_flag);
         else {
