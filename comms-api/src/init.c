@@ -16,7 +16,7 @@
 
 #define MAX_CONFIG_SIZE 1024	// TODO: make this a reasonable number
 #define NODECODE 12345			/* value of nodecode in node_t struct */
-#define IPCFILEDIR "/home/pringles/Documents/2019-2020-IARRC/comms-api/ipcfiles/"
+#define IPCFILEDIR "ipcfiles/"
 
 
 /* -------------------------------GLOBAL VARIABLES------------------------------------ */
@@ -116,11 +116,13 @@ void *init_node(char *config_path, topic_info_array_t *info_array) {
 	struct json_object *j_topics;												/* j_topics: value for key "topics", should contain an arraylist */
 	json_bool r = json_object_object_get_ex(j_configs, "topics", &j_topics);
 	if (r == FALSE) {
+		printf("Incorrect config format: \"topic\" cannot be found\n");
 		// TODO: set errno (incorrect config format)
 		return NULL;
 	}
 	struct array_list *topics = json_object_get_array(j_topics);				/* topics: json arraylist extracted from j_topics | <json-c/arraylist.h> */
 	if (topics == NULL) {
+		printf("Incorrect config format: \"topic\" is not an array\n");
 		// TODO: set errno (incorrect config format)
 		return NULL;
 	}
@@ -159,20 +161,25 @@ void *init_node(char *config_path, topic_info_array_t *info_array) {
 static struct json_object *parse_config(char *path) {
 	FILE *fp;
 	char buffer[MAX_CONFIG_SIZE];
-	struct json_object *parsed_json;
 	fp = fopen(path,"r");
 	if (fp == NULL) {
 		return NULL;
 	}
-	size_t x = fread(buffer, 1, MAX_CONFIG_SIZE, fp);	/* read at most MAX_CONFIG_SIZE bytes */
+	size_t stringlen = fread(buffer, 1, MAX_CONFIG_SIZE, fp);	/* read at most MAX_CONFIG_SIZE bytes */
 	if (ferror(fp)) {
 		fclose(fp);
 		return NULL;
 	}
 	fclose(fp);
-	parsed_json = json_tokener_parse(buffer);
-	if (parsed_json == NULL) {
-		// TODO: set errno (file is not in correct json format)
+	struct json_object *parsed_json = NULL;
+	struct json_tokener *tok = json_tokener_new();
+	enum json_tokener_error jerr;
+	do {
+		parsed_json = json_tokener_parse_ex(tok, buffer, stringlen);
+	} while ((jerr = json_tokener_get_error(tok)) == json_tokener_continue);
+	if (jerr != json_tokener_success) {
+		perror(json_tokener_error_desc(jerr));
+		return NULL;
 	}
 	return parsed_json;
 }
@@ -189,10 +196,12 @@ static int init_topics(struct array_list *topics, int n, topic_t **sock_array, t
 		if (strcmp(info->role, PUB) == 0) { type = ZMQ_PUB; }
 		else if (strcmp(info->role, SUB) == 0) { type = ZMQ_SUB; }
 		else { 
+			printf("Topic has invalid role: must be \"pub\" or \"sub\"\n");
 			// TODO: set errno (topic has invalid role)
 			return -1;
 		}
 		if (strcmp(info->transport, IPC) != 0 && strcmp(info->transport, INPROC) != 0) {
+			printf("Topic has invalid transport: must be \"ipc\" or \"inproc\"\n");
 			// TODO: set errno (topic has invalid transport)
 			return -1;
 		}
@@ -266,18 +275,22 @@ static topic_info_t *parse_topic(struct json_object *topic) {
 	topic_info_t *parsed = malloc(sizeof(topic_info_t));
 	if (parsed == NULL) return NULL;
 	if (json_object_object_get_ex(topic, "name", &j_name) == FALSE) {
+		printf("Missing config entry: \"name\"\n");
 		// TODO: set errno (missing config entry)
 		return NULL;
 	}
 	if (json_object_object_get_ex(topic, "role", &j_role) == FALSE) {
+		printf("Missing config entry: \"role\"\n");
 		// TODO: set errno (missing config entry)
 		return NULL;
 	}
 	if (json_object_object_get_ex(topic, "transport", &j_transport) == FALSE) {
+		printf("Missing config entry: \"transport\"\n");
 		// TODO: set errno (missing config entry)
 		return NULL;
 	}
 	if (json_object_object_get_ex(topic, "address", &j_address) == FALSE) {
+		printf("Missing config entry: \"address\"\n");
 		// TODO: set errno (missing config entry)
 		return NULL;
 	}
